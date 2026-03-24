@@ -26,23 +26,26 @@ interface Order {
 interface OrdersSectionProps {
   orders: Order[];
   onOrderPlaced: (order: Order) => void;
+  onOrderConfirmed?: (orderId: string) => void;
+  onOrderDeleted?: (orderId: string) => void;
 }
 
-export function OrdersSection({ orders, onOrderPlaced }: OrdersSectionProps) {
+export function OrdersSection({ orders, onOrderPlaced, onOrderConfirmed, onOrderDeleted }: OrdersSectionProps) {
   const [showPlaceOrderModal, setShowPlaceOrderModal] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const handleConfirmOrder = (orderId: string) => {
-    const order = orders.find(o => o.orderId === orderId);
-    if (order) {
-      // Update order status to confirmed
-      const updatedOrder = { ...order, status: 'confirmed' as const };
+    if (onOrderConfirmed) {
+      onOrderConfirmed(orderId);
       toast.success(`Order ${orderId} confirmed`);
     }
   };
 
   const handleDeleteOrder = (orderId: string) => {
-    toast.success(`Order ${orderId} deleted`);
+    if (onOrderDeleted) {
+      onOrderDeleted(orderId);
+      toast.success(`Order ${orderId} deleted`);
+    }
   };
 
   const pendingOrders = orders.filter(o => o.status === 'pending');

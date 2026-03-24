@@ -562,6 +562,11 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
     // Find all orders for this customer
     const customerOrders = orders.filter(o => o.customerId === baseCustomerId);
     
+    // Debug: log when we have orders to process
+    if (customerOrders.length > 0) {
+      console.log('[v0] Found', customerOrders.length, 'orders for customer', baseCustomerId, 'on', dayOfWeek);
+    }
+    
     if (customerOrders.length === 0) {
       return { status: target.status, color: 'default' };
     }

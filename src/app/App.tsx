@@ -172,7 +172,21 @@ export default function App() {
         );
       case 'orders':
         return (
-          <OrdersSection orders={orders} onOrderPlaced={(newOrder) => setOrders([...orders, newOrder])} />
+          <OrdersSection 
+            orders={orders} 
+            onOrderPlaced={(newOrder) => {
+              console.log('[v0] Order placed:', newOrder);
+              setOrders([...orders, newOrder]);
+            }}
+            onOrderConfirmed={(orderId) => {
+              console.log('[v0] Order confirmed:', orderId);
+              setOrders(orders.map(o => o.orderId === orderId ? { ...o, status: 'confirmed' as const } : o));
+            }}
+            onOrderDeleted={(orderId) => {
+              console.log('[v0] Order deleted:', orderId);
+              setOrders(orders.filter(o => o.orderId !== orderId));
+            }}
+          />
         );
       case 'order-history':
         return (

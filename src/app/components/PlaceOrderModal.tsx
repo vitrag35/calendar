@@ -139,6 +139,17 @@ export function PlaceOrderModal({ onClose, onOrderPlaced }: PlaceOrderModalProps
 
     onOrderPlaced(order);
     toast.success(`Order ${orderId} placed successfully for ${customer.name}`);
+    
+    // Reset form and close modal
+    setSelectedCustomer('');
+    setOrderDate(new Date().toISOString().split('T')[0]);
+    setItems([]);
+    setNewProduct('');
+    setNewQuantity('1');
+    setNewPrice('');
+    
+    // Close the modal
+    onClose();
   };
 
   return (
