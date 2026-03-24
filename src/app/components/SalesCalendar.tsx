@@ -15,7 +15,7 @@ interface Target {
   email: string;
   callTime?: string;
   status: 'pending' | 'done';
-  orderStatusColor?: 'default' | 'green' | 'yellow'; // For order-based status
+  orderStatusColor?: 'default' | 'green' | 'yellow' | 'red'; // For order-based status, red for missed
   customerName: string;
   companyName: string;
   creditLimit: string;
@@ -555,6 +555,8 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
   const getOrderStatusForTarget = (target: Target, dateKey: string) => {
     const targetDate = new Date(dateKey + 'T00:00:00');
     const targetDayOfWeek = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
     // Extract base customer ID from target (e.g., 'MON-1' from 'MON-1-2026-03-24')
     const baseCustomerId = target.id.split('-').slice(0, 2).join('-');
@@ -577,12 +579,6 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
     
     // Find all orders for this customer
     const customerOrders = orders.filter(o => o.customerId === baseCustomerId);
-    
-    console.log('[v0] Checking', baseCustomerId, 'on', targetDayOfWeek, '- Customer order day:', customerOrderDay, '- Orders found:', customerOrders.length);
-    
-    if (customerOrders.length === 0) {
-      return { status: target.status, color: 'default' };
-    }
 
     // Check if order was placed on this exact date (green - on-time)
     const orderOnExactDate = customerOrders.find(o => {
@@ -592,9 +588,6 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
         orderDate.getMonth() === targetDate.getMonth() &&
         orderDate.getDate() === targetDate.getDate();
       
-      if (isSameDate) {
-        console.log('[v0] Found on-time order for', baseCustomerId, 'on', dateKey);
-      }
       return isSameDate;
     });
 
@@ -603,22 +596,21 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
     }
 
     // Check if order was placed before this order day (yellow - prebook)
-    // This means: the order was placed on any day before this target date
     const prebookOrder = customerOrders.find(o => {
       const orderDate = new Date(o.orderDate);
-      // Only count as prebook if order was placed before this target date
-      const isBeforeTarget = orderDate < targetDate;
-      
-      if (isBeforeTarget) {
-        console.log('[v0] Found prebook order for', baseCustomerId, '- order placed on', orderDate.toLocaleDateString(), 'before target', dateKey);
-      }
-      return isBeforeTarget;
+      return orderDate < targetDate;
     });
 
     if (prebookOrder) {
       return { status: 'done', color: 'yellow' }; // Yellow for prebook (early order)
     }
 
+    // Check if this date is in the past with no order (red - missed)
+    if (targetDate < today && customerOrders.length === 0) {
+      return { status: 'missed', color: 'red' }; // Red for missed order day
+    }
+
+    // No order placed yet and date is in future (gray - pending)
     return { status: target.status, color: 'default' };
   };
 
@@ -689,23 +681,20 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
           </div>
           <div className="text-xs text-gray-500 mb-1">{dayOfWeek.substring(0, 3)}</div>
           {hasTargets && (
-            <div className="mt-auto space-y-1">
-              {/* Show status indicators */}
-              <div className="flex gap-1 flex-wrap">
+            <div className="mt-auto space-y-2">
+              {/* Show status indicator dots only */}
+              <div className="flex gap-2 justify-center flex-wrap">
                 {targetStatusCounts['green'] > 0 && (
-                  <div className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
-                    {targetStatusCounts['green']} on-time
-                  </div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full" title={`${targetStatusCounts['green']} on-time`}></div>
                 )}
                 {targetStatusCounts['yellow'] > 0 && (
-                  <div className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-semibold">
-                    {targetStatusCounts['yellow']} prebook
-                  </div>
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full" title={`${targetStatusCounts['yellow']} prebook`}></div>
+                )}
+                {targetStatusCounts['red'] > 0 && (
+                  <div className="w-2 h-2 bg-red-500 rounded-full" title={`${targetStatusCounts['red']} missed`}></div>
                 )}
                 {targetStatusCounts['default'] > 0 && (
-                  <div className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold">
-                    {targetStatusCounts['default']} pending
-                  </div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full" title={`${targetStatusCounts['default']} pending`}></div>
                 )}
               </div>
               <Button

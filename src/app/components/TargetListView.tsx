@@ -18,8 +18,8 @@ interface Target {
   phone: string;
   email: string;
   callTime?: string;
-  status: 'pending' | 'done';
-  orderStatusColor?: 'default' | 'green' | 'yellow';
+  status: 'pending' | 'done' | 'missed';
+  orderStatusColor?: 'default' | 'green' | 'yellow' | 'red';
   customerName: string;
   companyName: string;
   creditLimit: string;
@@ -125,6 +125,10 @@ export function TargetListView({ date, targets, onBack, onUpdateTarget, salesRep
                   ) : target.orderStatusColor === 'yellow' ? (
                     <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                       Done (Prebook)
+                    </Badge>
+                  ) : target.orderStatusColor === 'red' ? (
+                    <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
+                      Missed
                     </Badge>
                   ) : (
                     <Badge variant={target.status === 'done' ? 'default' : 'secondary'}>
