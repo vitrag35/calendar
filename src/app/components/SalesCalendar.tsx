@@ -553,43 +553,66 @@ export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRep
 
   // Function to get order status and color for a customer on a specific date
   const getOrderStatusForTarget = (target: Target, dateKey: string) => {
-    const dateObj = new Date(dateKey + 'T00:00:00');
-    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+    const targetDate = new Date(dateKey + 'T00:00:00');
+    const targetDayOfWeek = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
     
     // Extract base customer ID from target (e.g., 'MON-1' from 'MON-1-2026-03-24')
     const baseCustomerId = target.id.split('-').slice(0, 2).join('-');
     
+    // Extract customer's order day from their ID (e.g., 'MON' from 'MON-1')
+    const customerOrderDayPrefix = baseCustomerId.split('-')[0]; // 'MON', 'TUE', etc.
+    const dayOfWeekMap = {
+      'MON': 'Monday',
+      'TUE': 'Tuesday',
+      'WED': 'Wednesday',
+      'THU': 'Thursday',
+      'FRI': 'Friday'
+    };
+    const customerOrderDay = dayOfWeekMap[customerOrderDayPrefix as keyof typeof dayOfWeekMap];
+    
+    // This target is only relevant if it's on the customer's order day
+    if (targetDayOfWeek !== customerOrderDay) {
+      return { status: target.status, color: 'default' };
+    }
+    
     // Find all orders for this customer
     const customerOrders = orders.filter(o => o.customerId === baseCustomerId);
     
-    // Debug: log when we have orders to process
-    if (customerOrders.length > 0) {
-      console.log('[v0] Found', customerOrders.length, 'orders for customer', baseCustomerId, 'on', dayOfWeek);
-    }
+    console.log('[v0] Checking', baseCustomerId, 'on', targetDayOfWeek, '- Customer order day:', customerOrderDay, '- Orders found:', customerOrders.length);
     
     if (customerOrders.length === 0) {
       return { status: target.status, color: 'default' };
     }
 
-    // Check if order was placed on the order day (green - on-time)
-    const orderOnOrderDay = customerOrders.find(o => {
-      const orderDayOfWeek = new Date(o.orderDate).toLocaleDateString('en-US', { weekday: 'long' });
-      return orderDayOfWeek === dayOfWeek;
+    // Check if order was placed on this exact date (green - on-time)
+    const orderOnExactDate = customerOrders.find(o => {
+      const orderDate = new Date(o.orderDate);
+      const isSameDate = 
+        orderDate.getFullYear() === targetDate.getFullYear() &&
+        orderDate.getMonth() === targetDate.getMonth() &&
+        orderDate.getDate() === targetDate.getDate();
+      
+      if (isSameDate) {
+        console.log('[v0] Found on-time order for', baseCustomerId, 'on', dateKey);
+      }
+      return isSameDate;
     });
 
-    if (orderOnOrderDay) {
+    if (orderOnExactDate) {
       return { status: 'done', color: 'green' }; // Green for order on schedule
     }
 
     // Check if order was placed before this order day (yellow - prebook)
+    // This means: the order was placed on any day before this target date
     const prebookOrder = customerOrders.find(o => {
       const orderDate = new Date(o.orderDate);
-      const targetDate = new Date(dateKey + 'T00:00:00');
-      const orderDayOfWeek = new Date(o.orderDate).toLocaleDateString('en-US', { weekday: 'long' });
+      // Only count as prebook if order was placed before this target date
+      const isBeforeTarget = orderDate < targetDate;
       
-      // Order placed before target date AND target date is the customer's order day
-      // AND the order was for this same customer's order day
-      return orderDate < targetDate && orderDayOfWeek === dayOfWeek;
+      if (isBeforeTarget) {
+        console.log('[v0] Found prebook order for', baseCustomerId, '- order placed on', orderDate.toLocaleDateString(), 'before target', dateKey);
+      }
+      return isBeforeTarget;
     });
 
     if (prebookOrder) {
