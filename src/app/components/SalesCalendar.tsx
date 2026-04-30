@@ -15,6 +15,7 @@ interface Target {
   email: string;
   callTime?: string;
   status: 'pending' | 'done';
+  orderStatusColor?: 'default' | 'green' | 'yellow' | 'red'; // For order-based status, red for missed
   customerName: string;
   companyName: string;
   creditLimit: string;
@@ -405,16 +406,17 @@ const fridayCustomers: Omit<Target, 'status' | 'callTime'>[] = [
 // Generate targets for entire month with weekly recurring customers
 const generateMonthTargets = (): DayTargets => {
   const targets: DayTargets = {};
-  const today = new Date(2026, 2, 24); // March 24, 2026
+  const today = new Date(2026, 4, 1); // May 1, 2026
+  today.setHours(0, 0, 0, 0);
   
-  // March 2026 calendar
-  const daysInMarch = 31;
-  const marchStart = new Date(2026, 2, 1);
+  // May 2026 calendar
+  const daysInMay = 31;
+  const mayStart = new Date(2026, 4, 1);
   
-  for (let day = 1; day <= daysInMarch; day++) {
-    const currentDate = new Date(2026, 2, day);
+  for (let day = 1; day <= daysInMay; day++) {
+    const currentDate = new Date(2026, 4, day);
     const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const dateKey = `2026-03-${String(day).padStart(2, '0')}`;
+    const dateKey = `2026-05-${String(day).padStart(2, '0')}`;
     const isPast = currentDate < today;
     const isToday = currentDate.toDateString() === today.toDateString();
     
@@ -449,7 +451,7 @@ const generateMonthTargets = (): DayTargets => {
           notes: customer.notes || []
         };
         
-        // Add call times and notes for today (March 24, Monday)
+        // Add call times and notes for today (May 1, Thursday)
         if (isToday) {
           if (index === 0) {
             target.callTime = '09:30 AM';
@@ -487,8 +489,19 @@ const generateMonthTargets = (): DayTargets => {
 
 const mockTargets: DayTargets = generateMonthTargets();
 
-export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }) {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 24)); // March 24, 2026 (month is 0-indexed)
+interface Order {
+  orderId: string;
+  customerId: string;
+  customerName: string;
+  store: string;
+  orderDate: Date;
+  items: Array<{ product: string; quantity: number; price: number }>;
+  totalPrice: number;
+  status: 'pending' | 'confirmed';
+}
+
+export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRepId?: string; orders?: Order[] }) {
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 4, 1)); // May 1, 2026 (month is 0-indexed)
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [targets, setTargets] = useState<DayTargets>(mockTargets);
 
@@ -539,6 +552,69 @@ export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }
            today.getFullYear() === year;
   };
 
+  // Function to get order status and color for a customer on a specific date
+  const getOrderStatusForTarget = (target: Target, dateKey: string) => {
+    const targetDate = new Date(dateKey + 'T00:00:00');
+    const targetDayOfWeek = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Extract base customer ID from target (e.g., 'MON-1' from 'MON-1-2026-03-24')
+    const baseCustomerId = target.id.split('-').slice(0, 2).join('-');
+    
+    // Extract customer's order day from their ID (e.g., 'MON' from 'MON-1')
+    const customerOrderDayPrefix = baseCustomerId.split('-')[0]; // 'MON', 'TUE', etc.
+    const dayOfWeekMap = {
+      'MON': 'Monday',
+      'TUE': 'Tuesday',
+      'WED': 'Wednesday',
+      'THU': 'Thursday',
+      'FRI': 'Friday'
+    };
+    const customerOrderDay = dayOfWeekMap[customerOrderDayPrefix as keyof typeof dayOfWeekMap];
+    
+    // This target is only relevant if it's on the customer's order day
+    if (targetDayOfWeek !== customerOrderDay) {
+      return { status: target.status, color: 'default' };
+    }
+    
+    // Find all orders for this customer
+    const customerOrders = orders.filter(o => o.customerId === baseCustomerId);
+
+    // Check if order was placed on this exact date (green - on-time)
+    const orderOnExactDate = customerOrders.find(o => {
+      const orderDate = new Date(o.orderDate);
+      const isSameDate = 
+        orderDate.getFullYear() === targetDate.getFullYear() &&
+        orderDate.getMonth() === targetDate.getMonth() &&
+        orderDate.getDate() === targetDate.getDate();
+      
+      return isSameDate;
+    });
+
+    if (orderOnExactDate) {
+      return { status: 'done', color: 'green' }; // Green for order on schedule
+    }
+
+    // Check if order was placed before this order day (yellow - prebook)
+    const prebookOrder = customerOrders.find(o => {
+      const orderDate = new Date(o.orderDate);
+      return orderDate < targetDate;
+    });
+
+    if (prebookOrder) {
+      return { status: 'done', color: 'yellow' }; // Yellow for prebook (early order)
+    }
+
+    // Check if this date is in the past with no order (red - missed)
+    if (targetDate < today && customerOrders.length === 0) {
+      return { status: 'missed', color: 'red' }; // Red for missed order day
+    }
+
+    // No order placed yet and date is in future (gray - pending)
+    return { status: target.status, color: 'default' };
+  };
+
   const updateTarget = (targetId: string, updates: Partial<Target>) => {
     setTargets(prev => {
       const newTargets = { ...prev };
@@ -552,10 +628,20 @@ export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }
   };
 
   if (selectedDate && targets[selectedDate]) {
+    // Enhance targets with order status colors
+    const enhancedTargets = targets[selectedDate].map(target => {
+      const orderStatus = getOrderStatusForTarget(target, selectedDate);
+      return {
+        ...target,
+        status: orderStatus.status as 'pending' | 'done',
+        orderStatusColor: orderStatus.color as 'default' | 'green' | 'yellow'
+      };
+    });
+
     return (
       <TargetListView
         date={selectedDate}
-        targets={targets[selectedDate]}
+        targets={enhancedTargets}
         onBack={handleBackToCalendar}
         onUpdateTarget={updateTarget}
         salesRepId={salesRepId}
@@ -573,6 +659,15 @@ export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }
     const dayTargets = targets[dateKey] || [];
     const hasTargets = dayTargets.length > 0;
     const isTodayDate = isToday(day);
+    const dayOfWeek = new Date(year, month, day).toLocaleDateString('en-US', { weekday: 'long' });
+
+    // Get status colors for targets on this day
+    const targetStatusCounts = dayTargets.reduce((acc, target) => {
+      const orderStatus = getOrderStatusForTarget(target, dateKey);
+      const color = orderStatus.color;
+      acc[color] = (acc[color] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     calendarDays.push(
       <div
@@ -582,17 +677,35 @@ export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }
         }`}
       >
         <div className="h-full flex flex-col">
-          <div className={`mb-1 ${isTodayDate ? 'font-bold text-blue-600' : ''}`}>
+          <div className={`mb-1 text-xs font-semibold ${isTodayDate ? 'text-blue-600' : ''}`}>
             {day}
           </div>
+          <div className="text-xs text-gray-500 mb-1">{dayOfWeek.substring(0, 3)}</div>
           {hasTargets && (
-            <Button
-              onClick={() => handleDayClick(day)}
-              className="mt-auto w-full"
-              size="sm"
-            >
-              {dayTargets.length} {dayTargets.length === 1 ? 'target' : 'targets'}
-            </Button>
+            <div className="mt-auto space-y-2">
+              {/* Show status indicator dots only */}
+              <div className="flex gap-2 justify-center flex-wrap">
+                {targetStatusCounts['green'] > 0 && (
+                  <div className="w-2 h-2 bg-green-500 rounded-full" title={`${targetStatusCounts['green']} on-time`}></div>
+                )}
+                {targetStatusCounts['yellow'] > 0 && (
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full" title={`${targetStatusCounts['yellow']} prebook`}></div>
+                )}
+                {targetStatusCounts['red'] > 0 && (
+                  <div className="w-2 h-2 bg-red-500 rounded-full" title={`${targetStatusCounts['red']} missed`}></div>
+                )}
+                {targetStatusCounts['default'] > 0 && (
+                  <div className="w-2 h-2 bg-gray-400 rounded-full" title={`${targetStatusCounts['default']} pending`}></div>
+                )}
+              </div>
+              <Button
+                onClick={() => handleDayClick(day)}
+                className="w-full text-xs h-7"
+                size="sm"
+              >
+                View ({dayTargets.length})
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -603,7 +716,7 @@ export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }
     <div className="h-full flex flex-col p-6">
       <div className="mb-6">
         <h1 className="mb-4">Sales Calendar</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-4">
           <Button onClick={handleToday} variant="outline">
             Today
           </Button>
@@ -616,6 +729,38 @@ export function SalesCalendar({ salesRepId = 'SR-001' }: { salesRepId?: string }
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>
+
+        {/* Status Legend */}
+        <Card className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-semibold mb-3">📊 Order Status Legend:</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 border-2 border-green-600 rounded"></div>
+                  <span><span className="font-semibold">Green:</span> On-time (order placed on customer's order day)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-yellow-100 border-2 border-yellow-600 rounded"></div>
+                  <span><span className="font-semibold">Yellow:</span> Prebook (order placed before order day)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-gray-100 border-2 border-gray-600 rounded"></div>
+                  <span><span className="font-semibold">Gray:</span> Pending (no order yet)</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-xs bg-white bg-opacity-70 p-3 rounded border border-blue-200">
+              <p className="font-semibold text-blue-900 mb-2">💡 Quick Tips:</p>
+              <ul className="space-y-1 text-gray-700">
+                <li>• Go to <span className="font-semibold">Orders</span> tab to place orders</li>
+                <li>• Select a customer & choose any date</li>
+                <li>• Calendar updates with color status instantly</li>
+                <li>• Sample orders loaded - try placing your own!</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
       </div>
 
       <Card className="p-4 flex-1">
