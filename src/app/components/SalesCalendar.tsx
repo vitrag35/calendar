@@ -500,7 +500,7 @@ interface Order {
 }
 
 export function SalesCalendar({ salesRepId = 'SR-001', orders = [] }: { salesRepId?: string; orders?: Order[] }) {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 24)); // March 24, 2026 (month is 0-indexed)
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 4, 1)); // May 1, 2026 (month is 0-indexed)
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [targets, setTargets] = useState<DayTargets>(mockTargets);
 

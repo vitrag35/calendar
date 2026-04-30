@@ -18,40 +18,40 @@ interface Order {
   status: 'pending' | 'confirmed';
 }
 
-// Sample orders for demonstration
+// Sample orders for demonstration (May 2026)
 const SAMPLE_ORDERS: Order[] = [
   {
     orderId: 'ORD-2026-001',
     customerId: 'MON-1',
     customerName: 'John Smith',
     store: 'Quick Mart Downtown',
-    orderDate: new Date(2026, 2, 24), // Monday, March 24, 2026
+    orderDate: new Date(2026, 4, 5), // Monday, May 5, 2026
     items: [
       { product: 'Milk (1L)', quantity: 20, price: 2.50 },
       { product: 'Bread (Loaf)', quantity: 15, price: 3.00 },
     ],
     totalPrice: 95.00,
-    status: 'pending'
+    status: 'confirmed'
   },
   {
     orderId: 'ORD-2026-002',
     customerId: 'MON-2',
     customerName: 'Sarah Johnson',
     store: 'Super Save Market',
-    orderDate: new Date(2026, 2, 20), // Friday, March 20, 2026 (before Monday order day)
+    orderDate: new Date(2026, 3, 30), // Thursday, April 30, 2026 (prebook before Monday May 5)
     items: [
       { product: 'Eggs (Dozen)', quantity: 30, price: 4.50 },
       { product: 'Cheese (500g)', quantity: 10, price: 6.00 },
     ],
     totalPrice: 195.00,
-    status: 'pending'
+    status: 'confirmed'
   },
   {
     orderId: 'ORD-2026-003',
     customerId: 'TUE-1',
     customerName: 'Emily Davis',
     store: 'Fresh Foods Market',
-    orderDate: new Date(2026, 2, 25), // Wednesday, March 25, 2026 (before Tuesday order day)
+    orderDate: new Date(2026, 4, 1), // Thursday, May 1, 2026 (prebook before Tuesday May 6)
     items: [
       { product: 'Yogurt (1L)', quantity: 25, price: 3.50 },
     ],
@@ -63,12 +63,12 @@ const SAMPLE_ORDERS: Order[] = [
     customerId: 'MON-3',
     customerName: 'Mike Williams',
     store: 'City Grocery',
-    orderDate: new Date(2026, 2, 24), // Monday, March 24, 2026
+    orderDate: new Date(2026, 4, 5), // Monday, May 5, 2026
     items: [
       { product: 'Butter (250g)', quantity: 12, price: 5.00 },
     ],
     totalPrice: 60.00,
-    status: 'confirmed'
+    status: 'pending'
   },
 ];
 
