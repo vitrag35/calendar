@@ -406,16 +406,17 @@ const fridayCustomers: Omit<Target, 'status' | 'callTime'>[] = [
 // Generate targets for entire month with weekly recurring customers
 const generateMonthTargets = (): DayTargets => {
   const targets: DayTargets = {};
-  const today = new Date(2026, 2, 24); // March 24, 2026
+  const today = new Date(2026, 4, 1); // May 1, 2026
+  today.setHours(0, 0, 0, 0);
   
-  // March 2026 calendar
-  const daysInMarch = 31;
-  const marchStart = new Date(2026, 2, 1);
+  // May 2026 calendar
+  const daysInMay = 31;
+  const mayStart = new Date(2026, 4, 1);
   
-  for (let day = 1; day <= daysInMarch; day++) {
-    const currentDate = new Date(2026, 2, day);
+  for (let day = 1; day <= daysInMay; day++) {
+    const currentDate = new Date(2026, 4, day);
     const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const dateKey = `2026-03-${String(day).padStart(2, '0')}`;
+    const dateKey = `2026-05-${String(day).padStart(2, '0')}`;
     const isPast = currentDate < today;
     const isToday = currentDate.toDateString() === today.toDateString();
     
@@ -450,7 +451,7 @@ const generateMonthTargets = (): DayTargets => {
           notes: customer.notes || []
         };
         
-        // Add call times and notes for today (March 24, Monday)
+        // Add call times and notes for today (May 1, Thursday)
         if (isToday) {
           if (index === 0) {
             target.callTime = '09:30 AM';
